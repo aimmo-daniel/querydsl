@@ -98,6 +98,7 @@ public class MemberJpaRepository {
                 .fetch();
     }
 
+    // 실무
     public List<MemberTeamDto> search(MemberSearchCondition condition) {
         return queryFactory
                 .select(new QMemberTeamDto(

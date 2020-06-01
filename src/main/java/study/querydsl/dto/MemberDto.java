@@ -11,6 +11,8 @@ public class MemberDto {
     private String username;
     private int age;
 
+    // 프로젝션과 결과 반환 - @QueryProjection
+    // 생성자 + @QueryProjection
     @QueryProjection
     public MemberDto(String username, int age) {
         this.username = username;

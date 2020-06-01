@@ -12,6 +12,8 @@ public class MemberTeamDto {
     private Long teamId;
     private String teamName;
 
+    // 프로젝션과 결과 반환 - @QueryProjection
+    // 생성자 + @QueryProjection
     @QueryProjection
     public MemberTeamDto(Long memberId, String username, int age, Long teamId, String teamName) {
         this.memberId = memberId;

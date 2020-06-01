@@ -29,6 +29,7 @@ import study.querydsl.entity.Team;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceUnit;
 
 import java.beans.Expression;
@@ -44,7 +45,18 @@ import static study.querydsl.entity.QTeam.team;
 @Transactional
 public class QuerydslBasicTest {
 
-    @Autowired
+
+    /*
+         # fetch(): 리스트 조회, 데이터 없으면 빈 리스트 반환
+         # fetchOne(): 단 건 조회
+             -결과가 없으면 : null
+             -결과가 둘 이상이면 : com.querydsl.core.NonUniqueResultException
+         # fetchFirst(): limit(1).fetchOne()
+         # fetchResults(): 페이징 정보 포함, total count 쿼리 추가 실행
+         # fetchCount(): count 쿼리로 변경해서 count 수 조회
+     */
+
+    @PersistenceContext
     EntityManager em;
 
     JPAQueryFactory queryFactory;
@@ -174,8 +186,8 @@ public class QuerydslBasicTest {
         List<Member> result = queryFactory
                 .selectFrom(member)
                 .orderBy(member.username.desc())
-                .offset(1)
-                .limit(2)
+                .offset(1) //0부터 시작 (zero index)
+                .limit(2) //최대 2건 조회
                 .fetch();
 
         assertThat(result.size()).isEqualTo(2);
@@ -227,6 +239,7 @@ public class QuerydslBasicTest {
                 .from(member)
                 .join(member.team, team)
                 .groupBy(team.name)
+                //.having(member.age("ddd"))
                 .fetch();
 
         Tuple teamA = result.get(0);
@@ -240,9 +253,10 @@ public class QuerydslBasicTest {
 
     /**
      * TeamA에 소속된 모든 회원
+     * join(조인대상, 별칭으로 사용할 Q타입)
      */
     @Test
-    public void join() {
+    public void join() throws Exception {
         List<Member> result = queryFactory
                 .selectFrom(member)
                 .join(member.team, team)
@@ -255,7 +269,9 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * 세타조인
+     * 세타조인 (연관관계가 없는 필드로 조인)
+     * from 절에 여러 엔티티를 선택해서 세타 조인
+     * 외부 조인 불가능
      * 회원의 이름이 팀 이름과 같은 회원 조회
      */
     @Test
@@ -278,6 +294,7 @@ public class QuerydslBasicTest {
     /**
      * 예) 회원과 팀을 조인하면서, 팀 이름이 teamA인 팀만 조인, 회원은 모두 조회
      * JPQL: select m, t from Member m left join m.team t on t.name = 'teamA'
+     * ON절을 활용 1.조인대상 필터링, 2.연관관계 없는 엔티티 외부 조인 가능
      */
     @Test
     public void join_on_filtering() {
@@ -330,6 +347,10 @@ public class QuerydslBasicTest {
         assertThat(loaded).as("페치 조인 미적용").isFalse();
     }
 
+
+    // 페치 조인은 SQL 에서 제공하는 기능은 아니다.
+    // SQL 조인을 활용해서 연관된 엔티티를 SQL 한번에 조회하는 기능이다. 주로 성능 최적화에 사용하는 방법이다.
+    // 즉시 로딩으로 한번에 조회
     @Test
     public void fetchJoinUse() {
         em.flush();
@@ -337,7 +358,7 @@ public class QuerydslBasicTest {
 
         Member findMember = queryFactory
                 .selectFrom(member)
-                .join(member.team, team).fetchJoin()
+                .join(member.team, team).fetchJoin() //조인기능 뒤에 fetchJoin() 추가
                 .where(member.username.eq("member1"))
                 .fetchOne();
 
@@ -347,6 +368,7 @@ public class QuerydslBasicTest {
 
     /**
      * 나이가 가장 많은 회원 조회
+     * 서브쿼리
      */
     @Test
     public void subQuery() {
@@ -484,10 +506,14 @@ public class QuerydslBasicTest {
 
     }
 
+
+
+
     // 중급 활용
 
-
-    //프로젝션과 결과 반환
+    // 프로젝션과 결과 반환
+    // 프로젝션이란? : select 대상 지정
+    // 프로젝션 대상이 하나면 타입을 명확하게 지정할 수 있음
     @Test
     public void simpleProjection() {
         List<String> result = queryFactory
@@ -496,6 +522,7 @@ public class QuerydslBasicTest {
                 .fetch();
     }
 
+    // 프로젝션 대상이 둘 이상이면 Tuple 이나 DTO 로 조회
     @Test
     public void tupleProjection() {
         List<Tuple> result = queryFactory
@@ -521,7 +548,7 @@ public class QuerydslBasicTest {
         }
     }
 
-    // QueryDSL DTO 조회 - setter
+    // QueryDSL DTO 조회 - 프로퍼티 접근 setter
     @Test
     public void findDtoBySetter() {
         List<MemberDto> result = queryFactory
@@ -535,7 +562,7 @@ public class QuerydslBasicTest {
         }
     }
 
-    // QueryDSL DTO 조회 - field
+    // QueryDSL DTO 조회 - field 직접 접근
     @Test
     public void findDtoByField() {
         List<MemberDto> result = queryFactory
@@ -585,6 +612,9 @@ public class QuerydslBasicTest {
         }
     }
 
+
+    // 이 방법은 컴파일러로 타입을 체크할 수 있으므로 가장 안전한 방법이다.
+    // 다만 DTO 에 QueryDSL 어노테 이션을 유지해야 하는 점과 DTO 까지 Q 파일을 생성해야 하는 단점이 있다.
     @Test
     public void findDtoQueryProjection() {
         List<MemberDto> result = queryFactory
@@ -684,7 +714,7 @@ public class QuerydslBasicTest {
         //member3 = 30 -> DB member3
         //member4 = 40 -> DB member4
 
-        //영속성 데이터와 DB 데이터를 맞춘후 영속성 데이터 초기화
+        //영속성 데이터와 DB 데이터를 맞춘후 영속성 데이터 초기화 해주는것이 좋다!!
         em.flush();
         em.clear();
 
@@ -729,6 +759,7 @@ public class QuerydslBasicTest {
         }
     }
 
+    // lower 같은 ansi 표준 함수들은 querydsl 이 상당부분 내장하고 있다. 따라서 다음과 같이 처리해도 결과 는 같다.
     @Test
     public void sqlFunction2() {
         List<String> result = queryFactory
